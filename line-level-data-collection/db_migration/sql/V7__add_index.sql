@@ -1,0 +1,1 @@
+create index idx_query_by_lang_approval_status on data_entry(language, approval_status, entry_count)

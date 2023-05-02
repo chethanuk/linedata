@@ -1,0 +1,13 @@
+/out/*
+/python_playground/lldc/output.json
+/python_playground/lldc/output_json.json
+/terraform-modules/line-level-data-collection/.terraform/modules/
+**/terraform.tfvars
+**/__pycache__/
+corpus/google_drive/
+openapitools.json
+.venv
+report.html.json
+report.html.html
+.python-version
+.idea

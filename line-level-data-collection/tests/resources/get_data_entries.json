@@ -1,0 +1,99 @@
+{
+  "resource": "/v1/data_entries",
+  "path": "/v1/data_entries/",
+  "httpMethod": "GET",
+  "headers": {
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Host": "dataops-api.qa.ml-cdatai.com",
+    "Postman-Token": "da3126fd-4964-41ef-a43d-9aff4a52ba04",
+    "User-Agent": "PostmanRuntime/7.30.1",
+    "X-Amz-Date": "20230221T135738Z",
+    "X-Amzn-Trace-Id": "Root=1-63f4cdd2-6b709e8837ff7edd00457539",
+    "X-Forwarded-For": "49.131.36.172",
+    "X-Forwarded-Port": "443",
+    "X-Forwarded-Proto": "https"
+  },
+  "multiValueHeaders": {
+    "Accept": [
+      "*/*"
+    ],
+    "Accept-Encoding": [
+      "gzip, deflate, br"
+    ],
+    "Host": [
+      "dataops-api.qa.ml-cdatai.com"
+    ],
+    "Postman-Token": [
+      "da3126fd-4964-41ef-a43d-9aff4a52ba04"
+    ],
+    "User-Agent": [
+      "PostmanRuntime/7.30.1"
+    ],
+    "X-Amz-Date": [
+      "20230221T135738Z"
+    ],
+    "X-Amzn-Trace-Id": [
+      "Root=1-63f4cdd2-6b709e8837ff7edd00457539"
+    ],
+    "X-Forwarded-For": [
+      "49.131.36.172"
+    ],
+    "X-Forwarded-Port": [
+      "443"
+    ],
+    "X-Forwarded-Proto": [
+      "https"
+    ]
+  },
+  "queryStringParameters": {
+    "approval_status": "UNPROCESSED",
+    "language": "math",
+    "page_size": "10"
+  },
+  "multiValueQueryStringParameters": {
+    "approval_status": [
+      "UNPROCESSED"
+    ],
+    "language": [
+      "math"
+    ],
+    "page_size": [
+      "10"
+    ]
+  },
+  "pathParameters": null,
+  "stageVariables": null,
+  "requestContext": {
+    "resourceId": "p160s8",
+    "resourcePath": "/v1/data_entries",
+    "httpMethod": "GET",
+    "extendedRequestId": "AsUY9GRQSQ0FRbg=",
+    "requestTime": "21/Feb/2023:13:57:38 +0000",
+    "path": "/v1/data_entries/",
+    "accountId": "308382289355",
+    "protocol": "HTTP/1.1",
+    "stage": "qa",
+    "domainPrefix": "dataops-api",
+    "requestTimeEpoch": 1676987858657,
+    "requestId": "a45558e4-9e1f-4a03-bb9a-1a7ec7258c3f",
+    "identity": {
+      "cognitoIdentityPoolId": null,
+      "accountId": null,
+      "cognitoIdentityId": null,
+      "caller": null,
+      "sourceIp": "49.131.36.172",
+      "principalOrgId": null,
+      "accessKey": null,
+      "cognitoAuthenticationType": null,
+      "cognitoAuthenticationProvider": null,
+      "userArn": null,
+      "userAgent": "PostmanRuntime/7.30.1",
+      "user": null
+    },
+    "domainName": "dataops-api.qa.ml-cdatai.com",
+    "apiId": "8efgtanb1c"
+  },
+  "body": null,
+  "isBase64Encoded": false
+}

@@ -1,0 +1,1 @@
+create index idx_langauge on data_entry(language)

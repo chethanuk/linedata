@@ -1,0 +1,28 @@
+{
+  "version": "0",
+  "id": "ca554315-55c6-e15d-e652-651d44c6225f",
+  "detail-type": "Object Created",
+  "source": "aws.s3",
+  "account": "308382289355",
+  "time": "2023-02-17T04:36:07Z",
+  "region": "ap-southeast-1",
+  "resources": [
+    "arn:aws:s3:::lldc-qa-ingestion-bucket120230208060800956400000001"
+  ],
+  "detail": {
+    "version": "0",
+    "bucket": {
+      "name": "lldc-qa-ingestion-bucket120230208060800956400000001"
+    },
+    "object": {
+      "key": "d507a8a1-9973-4e8b-ab14-f1758efb8209",
+      "size": 63163,
+      "etag": "3dc5ee4ba1cd14423d1da93d794ab2d9",
+      "sequencer": "0063EF0437D993BF7C"
+    },
+    "request-id": "FTQ04E9F34KJZ2D1",
+    "requester": "308382289355",
+    "source-ip-address": "18.138.245.93",
+    "reason": "PutObject"
+  }
+}

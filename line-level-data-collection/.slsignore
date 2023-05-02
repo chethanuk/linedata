@@ -1,0 +1,11 @@
+notebooks/*
+db_migration/*
+docker/*
+note_modules/*
+tests/*
+script/**
+external/**
+venv/**
+.venv/**
+build/**
+.idea/**

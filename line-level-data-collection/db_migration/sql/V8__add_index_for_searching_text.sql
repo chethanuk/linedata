@@ -1,0 +1,1 @@
+create index idx_query_count_text on data_entry(language, label)

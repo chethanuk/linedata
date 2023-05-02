@@ -1,0 +1,249 @@
+openapi: 3.0.0
+info:
+  title: HandwritingDataCollection
+  description: |
+    Backend API for GN5 in-app handwriting data collection
+  version: 1.0.0
+servers:
+  - url: https://api.qa.ml-cdatai.com
+    description: |
+      qa env, credentials are stored the Research Vault in 1 password with the name
+      Line Level Data Collection App Credential: QA Env
+  - url: https://api.production.ml-cdatai.com
+    description: |
+      production env, credentials are stored the Research Vault in 1 password with the name
+      Line Level Data Collection App Credential: Prod Env
+
+paths:
+  /v1/line-level-data:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+    post:
+      tags:
+        - DataCollection
+      operationId: "UploadLineLevelData"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DataEntry"
+      responses:
+        "200":
+          description: "OK"
+
+  /v1/line-level-corpus/{language}:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+      - in: path
+        name: language
+        schema:
+          $ref: '#/components/schemas/Language'
+        required: true
+        description: "Language of corpus to retrieve from the server"
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetLineLevelCorpus"
+      summary: "Get the whole line level corpus"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Corpus'
+  /v1/corpus-line-error:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+    post:
+      tags:
+        - DataCollection
+      operationId: "ReportErroneousCorpusLine"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ErroneousCorpusLine"
+      responses:
+        "200":
+          description: "OK"
+
+
+components:
+  parameters:
+    auth-header-1:
+      name: Authorization
+      in: header
+      description: "Pleases take a look at https://github.com/awslabs/aws-crt-swift/tree/f3ae10c9a33bdc9d04246141ef0eb5840b369205"
+      schema:
+        type: string
+      example: |
+        AWS4-HMAC-SHA256 Credential=wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY/20150830/us-east-1/service/aws4_request,
+        SignedHeaders=content-length;host;x-amz-content-sha256;x-amz-date, Signature=
+    auth-header-2:
+      name: X-Amz-Date
+      in: header
+      description: "Pleases take a look at https://github.com/awslabs/aws-crt-swift/tree/f3ae10c9a33bdc9d04246141ef0eb5840b369205"
+      schema:
+        type: string
+    auth-header-3:
+      name: Host
+      in: header
+      description: "Pleases take a look at https://github.com/awslabs/aws-crt-swift/tree/f3ae10c9a33bdc9d04246141ef0eb5840b369205"
+      schema:
+        type: string
+        example: "example.amazonaws.com"
+    auth-header-4:
+      name: x-amz-content-sha256
+      in: header
+      description: "Pleases take a look at https://github.com/awslabs/aws-crt-swift/tree/f3ae10c9a33bdc9d04246141ef0eb5840b369205"
+      schema:
+        type: string
+        example: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+  schemas:
+    Corpus:
+      type: object
+      required:
+        - corpusVersion
+        - corpus
+        - language
+      properties:
+        corpusVersion:
+          type: number
+          description: "Version of the retrieved corpus"
+        corpus:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+          description: "The langauge the corpus is in"
+      example:
+        corpusVersion: 1
+        language: "math"
+        corpus:
+          - "x^n + y^n = z^n"
+          - "E=mc^2"
+          - "x^2+1"
+    DataEntry:
+      type: object
+      required:
+        - version
+        - source
+        - id
+        - label
+        - userID
+        - deviceID
+        - strokes
+        - language
+      description: "The data should be less than 1mb"
+      properties:
+        version:
+          type: number
+          description: "Version of post body format"
+          enum: [ 1 ]
+        source:
+          type: string
+          description: "Used to identify where the request is sent from"
+          example: [ "Vendor", "GN5" ]
+        id:
+          type: string
+          description: "ID of this data entry, should be UUID"
+        label:
+          $ref: '#/components/schemas/Label'
+        userID:
+          description: |
+            The ID used to differentiate users. Doesn't have to be a the user
+            id used by the app for privacy protection. should be a UUID.
+          type: string
+        deviceID:
+          description: ""
+          type: string
+        strokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stroke'
+        language:
+          $ref: '#/components/schemas/Language'
+    Stroke:
+      type: object
+      required:
+        - startTimestamp
+        - firstPoint
+        - points
+      properties:
+        startTimestamp:
+          type: integer
+          # max: 9,223,372,036,854,775,807
+          format: int64
+          description: "The timestamp in epoch millis format"
+        firstPoint:
+          $ref: "#/components/schemas/Point"
+        points:
+          description: "The array storing all the point deltas. It is used to represent the remaining points except the first point"
+          type: array
+          items:
+            $ref: '#/components/schemas/Point'
+    Point:
+      type: object
+      required:
+        - x
+        - y
+        - delay
+      properties:
+        x:
+          description: "The X coordinate of this point"
+          type: number
+        y:
+          description: "The Y coordinate of this point"
+          type: number
+        delay:
+          description: "The delay in milliseconds of this point since the start of the stroke"
+          type: integer
+          format: int32
+    Label:
+      description: "The label corresponding to the strokes"
+      type: object
+      required:
+        - content
+        - labelType
+      properties:
+        labelType:
+          description: "How the label is presented"
+          type: string
+          enum:
+            - "LATEX"
+        content:
+          description: "The content of the label"
+          type: string
+    Language:
+      description: |
+        language of corpus, warn!, please use safe characters for language as it will be used as the 
+        s3 object key. [ref](https://stackoverflow.com/questions/7116450/what-are-valid-s3-key-names-that-can-be-accessed-via-the-s3-rest-api)
+      type: string
+      enum:
+        - "math"
+        - "vendor_math"
+        - "english"
+    ErroneousCorpusLine:
+      description: "Problematic corpus line that doesn't make sense to the user"
+      type: object
+      required:
+        - content
+        - language
+      properties:
+        language:
+          $ref: '#/components/schemas/Language'
+        content:
+          type: string

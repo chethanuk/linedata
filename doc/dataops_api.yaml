@@ -1,0 +1,349 @@
+openapi: 3.0.0
+info:
+  title: "DataOpsForHandwritingDataCollection"
+  description: |
+    Backend API for line level handwriting data collection
+  version: 1.0.0
+servers:
+  - url: https://dataops-api.qa.ml-cdatai.com
+    description: |
+      qa env, credentials are stored the Research Vault in 1 password with the name
+      data ops line level data collection Credential: QA Env
+  - url: https://dataops-api.production.ml-cdatai.com
+    description: |
+      production env, credentials are stored the Research Vault in 1 password with the name
+      data ops line level data collection Credential: Prod Env
+
+paths:
+  /v1/languages:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetLanguages"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  languages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Language'
+  /v1/data_entries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+      - name: id
+        in: path
+        description: ID of data entry
+        schema:
+          type: string
+        required: true
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetDataEntryByID"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEntry'
+    put:
+      tags:
+        - DataCollection
+      operationId: "UpdateDataEntryByID"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - approval_status
+              properties:
+                label:
+                  type: string
+                approval_status:
+                  $ref: '#/components/schemas/ApprovalStatus'
+      responses:
+        200:
+          description: "OK"
+  /v1/data_entries:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+      - name: page_size
+        in: query
+        description: max counts of the returned query
+        schema:
+          type: integer
+        required: true
+      - name: language
+        in: query
+        description: language to choose
+        schema:
+          type: string
+        required: true
+      - name: approval_status
+        in: query
+        description: approval status to filter
+        schema:
+          $ref: '#/components/schemas/ApprovalStatus'
+        required: true
+      - name: page_token
+        in: query
+        description: |
+          a token for the backend to do pagination. Please take a look at this for more detail
+          https://tec.xenby.com/36-%E9%BE%90%E5%A4%A7%E8%B3%87%E6%96%99%E5%BA%AB%E5%88%86%E9%A0%81%E6%96%B9%E6%A1%88-cursor-based-pagination
+        schema:
+          type: string
+      - name: is_ascending
+        in: query
+        schema:
+          type: boolean
+          enum:
+            - true
+            - false
+        description: |
+          whether should sort the entries by time in ascending order, i.e., should earlier entry comes first
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetDataEntries"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+  /v1/data_entry_statistics:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+      - name: language
+        in: query
+        description: language to choose
+        schema:
+          type: string
+        required: true
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetStatistics"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statistics:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DataEntryStatistics'
+  /v1/label_counts:
+    parameters:
+      - $ref: "#/components/parameters/auth-header-1"
+      - $ref: "#/components/parameters/auth-header-2"
+      - $ref: "#/components/parameters/auth-header-3"
+      - $ref: "#/components/parameters/auth-header-4"
+      - name: language
+        in: query
+        description: language to choose
+        schema:
+          type: string
+        required: true
+      - name: encoded_label
+        in: query
+        description: |
+          ```python
+          # encode your label by
+          import base64
+          from urllib.parse import unquote, quote
+          quote(base64.b64encode(label.encode('utf-8')).decode('utf-8'))
+          ```
+        schema:
+          type: string
+        required: true
+    get:
+      tags:
+        - DataCollection
+      operationId: "GetCountByLabel"
+      responses:
+        200:
+          description: "OK"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  label:
+                    type: string
+                  counts:
+                    type: array
+                    items:
+                      type: object
+                      description: |
+                        an entry will appear only if count is >0. for example, 
+                        if there's no rejected entries, there will be no records in this array with 
+                        status equal to REJECTED
+                      properties:
+                        status:
+                          $ref: '#/components/schemas/ApprovalStatus'
+                        count:
+                          type: integer
+        404:
+          description: if there isn't any entries in the database, it will return 404
+
+
+components:
+  parameters:
+    auth-header-1:
+      name: Authorization
+      in: header
+      description: "Pleases take a look at https://github.com/andrewjroth/requests-auth-aws-sigv4"
+      schema:
+        type: string
+      example: |
+        AWS4-HMAC-SHA256 Credential=wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY/20150830/us-east-1/service/aws4_request,
+        SignedHeaders=content-length;host;x-amz-content-sha256;x-amz-date, Signature=
+    auth-header-2:
+      name: X-Amz-Date
+      in: header
+      description: "Pleases take a look at https://github.com/andrewjroth/requests-auth-aws-sigv4"
+      schema:
+        type: string
+    auth-header-3:
+      name: Host
+      in: header
+      description: "Pleases take a look at https://github.com/andrewjroth/requests-auth-aws-sigv4"
+      schema:
+        type: string
+        example: "example.amazonaws.com"
+    auth-header-4:
+      name: x-amz-content-sha256
+      in: header
+      description: "Pleases take a look at https://github.com/andrewjroth/requests-auth-aws-sigv4"
+      schema:
+        type: string
+        example: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+  schemas:
+    DataEntry:
+      type: object
+      required:
+        - source
+        - id
+        - label
+        - label_type
+        - device_id
+        - user_id
+        - strokes
+        - language
+        - created_at
+        - approval_status
+      description: "The data should be less than 1mb"
+      properties:
+        source:
+          type: string
+          description: "Used to identify where the request is sent from"
+          example: [ "Vendor", "GN5" ]
+        id:
+          type: string
+          description: "ID of this data entry, should be UUID"
+        label:
+          type: string
+        label_type:
+          type: string
+          description: "How the label is presented"
+          enum:
+            - "LATEX"
+        user_id:
+          type: string
+        device_id:
+          type: string
+        strokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Stroke'
+        language:
+          $ref: '#/components/schemas/Language'
+        created_at:
+          type: string
+        approval_status:
+          $ref: '#/components/schemas/ApprovalStatus'
+    Stroke:
+      type: object
+      required:
+        - startTimestamp
+        - firstPoint
+        - points
+      properties:
+        startTimestamp:
+          type: integer
+          # max: 9,223,372,036,854,775,807
+          format: int64
+          description: "The timestamp in epoch millis format"
+        firstPoint:
+          $ref: "#/components/schemas/Point"
+        points:
+          description: "The array storing all the point deltas. It is used to represent the remaining points except the first point"
+          type: array
+          items:
+            $ref: '#/components/schemas/Point'
+    Point:
+      type: object
+      required:
+        - x
+        - y
+        - delay
+      properties:
+        x:
+          description: "The X coordinate of this point"
+          type: number
+        y:
+          description: "The Y coordinate of this point"
+          type: number
+        delay:
+          description: "The delay in milliseconds of this point since the start of the stroke"
+          type: integer
+          format: int32
+    Language:
+      type: string
+    ApprovalStatus:
+      type: string
+      enum:
+        - "UNPROCESSED"
+        - "APPROVED"
+        - "REJECTED"
+    DataEntryStatistics:
+      type: object
+      required:
+        - language
+        - status
+        - count
+      properties:
+        language:
+          $ref: '#/components/schemas/Language'
+        status:
+          type: string
+        count:
+          type: integer

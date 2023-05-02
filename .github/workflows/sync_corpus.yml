@@ -1,0 +1,26 @@
+name: Sync corpus from QA to Prod Env
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-known-hosts: 'github.com'
+      - name: sync QA bucket to Prod bucket
+        run: |
+          cd ci && bash ./sync_corpus.sh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: 'eu-west-2'
+      - name: cache corpus
+        uses: actions/upload-artifact@v3
+        with:
+          name: corpus
+          path: ./ci/corpus/

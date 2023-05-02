@@ -1,0 +1,35 @@
+version: "3.9"
+services:
+  postgres:
+    image: "postgres:13.3-alpine3.14"
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: line_level_data_collection
+      POSTGRES_USER: db_user
+  localstack:
+    image: localstack/localstack
+    ports:
+      - 4566:4566
+      - 4571:4571
+    environment:
+      SERVICES: s3,sqs,sns
+  lambda:
+    container_name: local-lambda
+    image: local-lambda:latest
+    command: [ "sh", "-c", "tail -f /dev/null" ]
+    environment:
+      AWS_MOCK_URL: http://localstack:4566
+      DATABASE_NAME: line_level_data_collection
+      HOST: postgres
+      PASSWORD: test
+      PORT: 5432
+      USER_NAME: db_user
+    volumes:
+      - ".:/workspace"
+  aws-cli:
+    image: local-aws-cli:latest
+    command: [ "sh", "-c", "tail -f /dev/null" ]
+    volumes:
+      - "./aws_cli_test_scripts:/workspace"

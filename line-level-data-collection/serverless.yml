@@ -1,0 +1,177 @@
+service: line-level-data-collection
+
+frameworkVersion: '3'
+
+
+# Stage parameters
+params:
+  # Values for the "production" stage
+  staging:
+    environment: staging
+    region: ap-southeast-1
+    ingestionBucketName: lldc_staging_ingestion_bucket1
+    corpusBucketName: lldc_staging_corpus_bucket
+    customEventBusName: lldc_staging_event_bus
+  production:
+    environment: production
+    region: eu-west-2
+    ingestionBucketName: lldc_production_ingestion_bucket1
+    corpusBucketName: lldc_production_corpus_bucket
+    customEventBusName: lldc_production_event_bus
+  qa:
+    environment: qa
+    region: ap-southeast-1
+    ingestionBucketName: lldc_qa_ingestion_bucket1
+    corpusBucketName: lldc_qa_corpus_bucket
+    customEventBusName: lldc_qa_event_bus
+
+
+provider:
+  name: aws
+  runtime: python3.7
+  tags:
+    Environment: ${param:environment}
+    Service: "LineLevelDataCollection"
+  stackTags:
+    Environment: ${param:environment}
+    Service: "LineLevelDataCollection"
+  # noinspection YAMLSchemaValidation
+  region: ${param:region}
+  apiGateway:
+    minimumCompressionSize: 1024
+  ecr:
+    # In this section you can define images that will be built locally and uploaded to ECR
+    images:
+      # noinspection YAMLSchemaValidation
+      appimage:
+        # docker context
+        path: ./
+        file: ./release/Dockerfile
+        platform: linux/amd64
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "s3:GetObject"
+          Resource:
+            - ${ssm:lldc_${param:environment}_ingestion_bucket1_arn}/*
+
+functions:
+  log_event:
+    handler: line_level_data_collection/handlers/log_event.log_event
+  consolidation2:
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/consolidate.consolidate_data
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:${param:ingestionBucketName}}
+    events:
+      - eventBridge:
+          # noinspection YAMLSchemaValidation
+          name: ${ssm:${param:customEventBusName}}
+          pattern:
+            source:
+              - aws.s3
+            detail-type:
+              - 'Object Created'
+            detail:
+              bucket:
+                name:
+                  # WARN: there shouldn't be any space between ssm: and ${}
+                  - ${ssm:${param:ingestionBucketName}}
+
+plugins:
+  - serverless-apigateway-service-proxy
+  - serverless-domain-manager
+  - serverless-python-requirements # useful if you have dependencies other than the default ones
+  - serverless-ignore
+
+package:
+  individually: true
+  exclude:
+    - node_modules/**
+    - venv/**
+    - .venv/**
+    - tests/**
+    - notebooks/**
+    - db_migrations/**
+    - script/**
+    - build/**
+    - .idea/**
+    - external/**
+
+custom:
+  # pythonRequirements:
+  #   dockerizePip: true
+  #   slim: true
+  #   useDownloadCache: true
+  #   useStaticCache: true
+  #   invalidateCaches: true
+
+  #    vendor: ./vendor
+  apiGatewayServiceProxies:
+    - s3:
+        path: /v1/line-level-data
+        method: post
+        action: PutObject
+        bucket: ${ssm:${param:ingestionBucketName}}
+        cors: true
+        authorizationType: 'AWS_IAM'
+        requestParameters:
+          'integration.request.path.object': 'context.requestId'
+    - s3:
+        path: /v1/line-level-corpus/{language} # use path param
+        method: get
+        action: GetObject
+        pathOverride: '{language}.json'
+        bucket: ${ssm:${param:corpusBucketName}}
+        requestParameters:
+          # if requestParameters has a 'integration.request.path.object' property you should remove the key setting
+          'integration.request.path.language': 'method.request.path.language'
+          'integration.request.path.object': 'context.requestId'
+        cors: true
+        authorizationType: 'AWS_IAM'
+        response:
+          template:
+            # `serverError` is used when the integration response is 500
+            serverError: |-
+              { "message": "there was an error handling your request" }
+    - s3:
+        path: /v1/corpus-line-error
+        method: post
+        action: PutObject
+        bucket: ${ssm:lldc_${param:environment}_error_reporting_bucket}
+        cors: true
+        authorizationType: 'AWS_IAM'
+        requestParameters:
+          'integration.request.path.object': 'context.requestId'
+  customDomain:
+    domainName: api.${opt:stage}.ml-cdatai.com
+    stage: ${opt:stage}
+    certificateName: '${opt:stage}.ml-cdatai.com'
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: REGIONAL
+    securityPolicy: tls_1_2
+    apiType: rest
+    autoDomain: true
+  lldc-config:
+    vpc:
+      securityGroupIds:
+        - ${ssm:lldc_${param:environment}_default_vpc_security_group_id} #Note: 1. DO NOT place a space between ssm and ':'.
+      subnetIds: ${ssm:lldc_${param:environment}_vpc_private_subnet_ids}
+    database:
+      database_name: ${ssm:lldc_${param:environment}_rds_db_name}
+      host_name: ${ssm:lldc_${param:environment}_rds_host_name}
+      port: ${ssm:lldc_${param:environment}_rds_port} #!
+      user_name: ${ssm:lldc_${param:environment}_rds_user_name}
+      password: ${ssm:lldc_${param:environment}_rds_user_password}

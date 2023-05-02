@@ -1,0 +1,423 @@
+service: lldc-verification-app
+
+frameworkVersion: '3'
+
+# Stage parameters
+params:
+  # Values for the "production" stage
+  staging:
+    environment: staging
+    region: ap-southeast-1
+    capacity: 100
+    cron_interval: rate(1 minute)
+  production:
+    environment: production
+    region: eu-west-2
+    capacity: 20000
+    cron_interval: rate(1 minute)
+  qa:
+    environment: qa
+    region: ap-southeast-1
+    capacity: 100
+    cron_interval: rate(1 minute)
+
+package:
+  individually: true
+  exclude:
+    - node_modules/**
+    - venv/**
+    - .venv/**
+    - tests/**
+    - notebooks/**
+    - db_migrations/**
+    - script/**
+    - build/**
+    - .idea/**
+    - external/**
+
+provider:
+  name: aws
+  runtime: python3.7
+  tags:
+    Environment: ${param:environment}
+    Service: "LineLevelDataCollection"
+  stackTags:
+    Environment: ${param:environment}
+    Service: "LineLevelDataCollection"
+  # noinspection YAMLSchemaValidation
+  region: ${param:region}
+  apiGateway:
+    minimumCompressionSize: 1024
+  ecr:
+    # In this section you can define images that will be built locally and uploaded to ECR
+    images:
+      # noinspection YAMLSchemaValidation
+      appimage:
+        # docker context
+        path: ./
+        file: ./release/Dockerfile
+        platform: linux/amd64
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - "s3:GetObject"
+            - "s3:PutObject"
+            - "s3:DeleteObject"
+            - "s3:DeleteObjectVersion"
+            - "s3:GetObjectVersion"
+          Resource:
+            - ${ssm:lldc_${param:environment}_data_entry_event_arn}/*
+            - ${ssm:lldc_${param:environment}_aggregation_arn}/*
+            - ${ssm:lldc_${param:environment}_data_entry_event_v2_arn}/*
+            - ${ssm:lldc_${param:environment}_aggregation_bucket_v2_arn}/*
+        - Effect: Allow
+          Action:
+            - "s3:ListBucket"
+            - "s3:ListBucketVersions"
+          Resource:
+            - ${ssm:lldc_${param:environment}_data_entry_event_arn}
+            - ${ssm:lldc_${param:environment}_aggregation_arn}
+            - ${ssm:lldc_${param:environment}_data_entry_event_v2_arn}
+            - ${ssm:lldc_${param:environment}_aggregation_bucket_v2_arn}
+
+
+functions:
+  log_event:
+    handler: line_level_data_collection/handlers/log_event.log_event
+    events:
+      - http:
+          path: /v1/log_event
+          method: get
+          cors: true
+  get_languages:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.get_languages
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+    events:
+      - http:
+          path: /v1/languages
+          method: get
+          cors: true
+  get_sources:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.get_sources
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+    events:
+      - http:
+          path: /v1/sources
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                language: true
+  update_event_entry:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.update_data_entry
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_data_entry_event}
+      S3_BUCKET_V2: ${ssm:lldc_${param:environment}_data_entry_event_v2}
+    events:
+      - http:
+          path: /v1/data_entries/{id}
+          method: put
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+  get_data_entries_docker:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.get_data_entries
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_data_entry_event}
+    events:
+      - http:
+          path: /v1/data_entries
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                page_size: true
+                language: true
+                approval_status: true
+                page_token: false
+                is_ascending: true
+                source: false
+  get_statistics:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.get_statistics
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_data_entry_event}
+    events:
+      - http:
+          path: /v1/data_entry_statistics
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                language: true
+                source: false
+  get_event_entry:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/verification.get_data_entry
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_data_entry_event}
+    events:
+      - http:
+          path: /v1/data_entries/{id}
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                id: true
+  get_data_by_language:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/snapshot.handler
+    environment:
+      S3_BUCKET: ${ssm:lldc_${param:environment}_aggregation_id}
+    events:
+      - http:
+          path: /v1/data_update_event_aggregate/{language}
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                language: true
+  aggregate_events:
+    timeout: 900
+    memorySize: 10240
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/aggregate.aggregate_events
+    environment:
+      S3_BUCKET: ${ssm:lldc_${param:environment}_aggregation_id}
+      CAPACITY: ${param:capacity}
+    events:
+      - eventBridge:
+          # noinspection YAMLSchemaValidation
+          name: lldc_${param:environment}_event_bus
+          pattern:
+            source:
+              - aws.s3
+            detail-type:
+              - 'Object Created'
+            detail:
+              bucket:
+                name:
+                  # WARN: there shouldn't be any space between ssm: and ${}
+                  - ${ssm:lldc_${param:environment}_data_entry_event}
+    reservedConcurrency: 1
+  get_data_count_by_labels:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/count_data.get_data_entry_count
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+    events:
+      - http:
+          path: /v1/label_counts
+          method: get
+          cors: true
+          request:
+            parameters:
+              querystrings:
+                language: true
+                encoded_label: true
+  aggregate_event_to_db:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/aggregate_v2.aggregate_events_to_db
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_data_entry_event_v2}
+    events:
+      - eventBridge:
+          # noinspection YAMLSchemaValidation
+          name: lldc_${param:environment}_event_bus
+          pattern:
+            source:
+              - aws.s3
+            detail-type:
+              - 'Object Created'
+            detail:
+              bucket:
+                name:
+                  # WARN: there shouldn't be any space between ssm: and ${}
+                  - ${ssm:lldc_${param:environment}_data_entry_event_v2}
+  aggregate_event_to_s3_math:
+    reservedConcurrency: 1
+    timeout: 900
+    memorySize: 10240
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/aggregate_v2.write_events_to_s3
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      CAPACITY: ${param:capacity}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_aggregation_bucket_v2}
+      LANGUAGE: 'math'
+    events:
+      - schedule: ${param:cron_interval}
+  aggregate_event_s3_v_math:
+    reservedConcurrency: 1
+    timeout: 900
+    memorySize: 10240
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/aggregate_v2.write_events_to_s3
+    # noinspection YAMLSchemaValidation
+    vpc: ${self:custom.lldc-config.vpc}
+    environment:
+      DATABASE_NAME: ${self:custom.lldc-config.database.database_name}
+      HOST: ${self:custom.lldc-config.database.host_name}
+      PASSWORD: ${self:custom.lldc-config.database.password}
+      PORT: ${self:custom.lldc-config.database.port}
+      USER_NAME: ${self:custom.lldc-config.database.user_name}
+      CAPACITY: ${param:capacity}
+      S3_BUCKET: ${ssm:lldc_${param:environment}_aggregation_bucket_v2}
+      LANGUAGE: 'vendor_math'
+    events:
+      - schedule: ${param:cron_interval}
+  get_data_by_language_v2:
+    timeout: 30
+    image:
+      name: appimage
+      command:
+        - line_level_data_collection/handlers/aggregate_v2.get_data_info
+    environment:
+      S3_BUCKET_V2: ${ssm:lldc_${param:environment}_aggregation_bucket_v2}
+    events:
+      - http:
+          path: /v2/data_update_event_aggregate/{language}
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                language: true
+
+
+plugins:
+  - serverless-apigateway-service-proxy
+  - serverless-domain-manager
+  - serverless-python-requirements # useful if you have dependencies other than the default ones
+  - serverless-ignore
+
+
+custom:
+  customDomain:
+    domainName: dataops-api.${opt:stage}.ml-cdatai.com
+    stage: ${opt:stage}
+    certificateName: '${opt:stage}.ml-cdatai.com'
+    createRoute53Record: true
+    createRoute53IPv6Record: true
+    endpointType: REGIONAL
+    securityPolicy: tls_1_2
+    apiType: rest
+    autoDomain: true
+  lldc-config:
+    vpc:
+      securityGroupIds:
+        - ${ssm:lldc_${param:environment}_default_vpc_security_group_id} #Note: 1. DO NOT place a space between ssm and ':'.
+      subnetIds: ${ssm:lldc_${param:environment}_vpc_private_subnet_ids}
+    database:
+      database_name: ${ssm:lldc_${param:environment}_rds_db_name}
+      host_name: ${ssm:lldc_${param:environment}_rds_host_name}
+      port: ${ssm:lldc_${param:environment}_rds_port} #!
+      user_name: ${ssm:lldc_${param:environment}_rds_user_name}
+      password: ${ssm:lldc_${param:environment}_rds_user_password}
