@@ -1,0 +1,36 @@
+name: BuildAndTest-CI pipeline
+
+on:
+  push:
+    branches:
+      - feature
+      - '!release*'
+  pull_request:
+    branches:
+      - master
+      - '!release*'
+jobs:
+  build:
+    name: "BuildTest with Python ${{ matrix.python-version }} JDK ${{ matrix.java }}, Hadoop ${{ matrix.hadoop }}, Spark ${{ matrix.spark-version }}"
+    # os: [ubuntu-latest, macos-latest, windows-latest]
+    strategy:
+      fail-fast: false
+      matrix:
+        hadoop: [3.2]
+        java: [11]
+        spark-version: [3.0.2]
+        python-version: [3.7, 3.8]
+        scala-version: [2.12]
+    # Run on ubuntu
+    runs-on: ubuntu-20.04
+    env:
+      GITHUB_PREV_SHA: ${{ github.event.before }}
+      PYTHON_VERSION: ${{ matrix.python-version }}
+      SPARK_VERSION: ${{ matrix.spark-version }}
+      SCALA_VERSION: 2.12
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Spark repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
