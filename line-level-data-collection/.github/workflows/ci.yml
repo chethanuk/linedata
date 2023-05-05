@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - test-branch
-      - '!release*'
 jobs:
   build:
     name: "BuildTest with Python ${{ matrix.python-version }} JDK ${{ matrix.java }}, Hadoop ${{ matrix.hadoop }}, Spark ${{ matrix.spark-version }}"
