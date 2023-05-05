@@ -1,6 +1,8 @@
 /out/*
 /python_playground/lldc/output.json
 /python_playground/lldc/output_json.json
+/act_Linux_x86_64
+/actions-runner-linux-x64-2.304.0
 /terraform-modules/line-level-data-collection/.terraform/modules/
 **/terraform.tfvars
 **/__pycache__/
